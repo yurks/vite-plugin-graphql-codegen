@@ -5,14 +5,10 @@ import {
   generate,
   loadContext,
 } from '@graphql-codegen/cli';
-import {
-  type FileMatcher,
-  isCodegenConfig,
-  isGraphQLDocument,
-  isGraphQLSchema,
-} from './utils/fileMatchers';
+import { isCodegenConfig, isFileMatched } from './utils/fileMatchers';
 import { isBuildMode, isServeMode, type ViteMode } from './utils/viteModes';
 import { debugLog } from './utils/debugLog';
+import { getDocumentPaths, getSchemaPaths } from './utils/configPaths';
 
 export interface Options {
   /**
@@ -185,49 +181,41 @@ export function GraphQLCodegen(options?: Options): Plugin {
         }
       }
     },
-    configureServer(server) {
+    async configureServer(server) {
       if (!enableWatcher) return;
 
+      const documentPaths = await getDocumentPaths(codegenContext);
+      const schemaPaths = await getSchemaPaths(codegenContext);
+
+      const isMatch = (filePath: string) => {
+        let matched = false;
+        if (matchOnDocuments) {
+          if (isFileMatched(filePath, documentPaths)) {
+            matched = true;
+            log(`Graphql document file matched: ${filePath}`);
+          }
+        }
+
+        if (matchOnSchemas) {
+          if (isFileMatched(filePath, schemaPaths)) {
+            matched = true;
+            log(`Graphql schema file matched: ${filePath}`);
+          }
+        }
+
+        return matched;
+      };
+
       const listener = async (filePath = '') => {
-        const isConfig = await isCodegenConfig(filePath, codegenContext);
+        const isConfig = isCodegenConfig(filePath, codegenContext.filepath);
 
         if (isConfig) {
           log('Codegen config file changed, restarting vite');
-          server.restart();
+          await server.restart();
           return;
         }
 
-        const matchers: [
-          enabled: boolean,
-          name: string,
-          matcher: FileMatcher,
-        ][] = [
-          [matchOnDocuments, 'document', isGraphQLDocument],
-          [matchOnSchemas, 'schema', isGraphQLSchema],
-        ];
-
-        const matcherResults = await Promise.all(
-          matchers.map(async ([enabled, name, matcher]) => {
-            if (!enabled) {
-              return false;
-            }
-
-            try {
-              const isMatch = await matcher(filePath, codegenContext);
-              if (isMatch) log(`Graphql ${name} file matched: ${filePath}`);
-
-              return isMatch;
-            } catch (error) {
-              // GraphQL Codegen handles logging useful errors
-              log(`Check for ${name} file failed in file watcher: ${filePath}`);
-              return false;
-            }
-          }),
-        );
-
-        const isMatch = matcherResults.some((result) => result);
-
-        if (!isMatch) return;
+        if (!isMatch(filePath)) return;
 
         try {
           await generateWithOverride(configOverrideWatcher);
