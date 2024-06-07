@@ -1,4 +1,0 @@
-type Query {
-  foo: String
-  bar: Int
-}

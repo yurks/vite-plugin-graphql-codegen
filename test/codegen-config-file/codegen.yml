@@ -1,7 +1,0 @@
-schema: ./test/codegen-config-file/schema.graphql
-documents: ./test/codegen-config-file/graphql/**/*.graphql
-generates:
-  ./test/codegen-config-file/generated/graphql.ts:
-    plugins:
-      - typescript
-      - typescript-operations
