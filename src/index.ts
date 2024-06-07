@@ -145,6 +145,13 @@ export function GraphQLCodegen(options?: Options): Plugin {
         throw error;
       }
 
+      if (!matchOnDocuments) {
+        log(`File watcher for documents is disabled by config`);
+      }
+      if (!matchOnSchemas) {
+        log(`File watcher for schemas is disabled by config`);
+      }
+
       viteMode = env.command;
     },
     async buildStart() {
